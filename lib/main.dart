@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 
 /// 🔁 Background handler
 @pragma('vm:entry-point')
@@ -8,7 +11,13 @@ void backgroundMessageHandler(SmsMessage message) async {
   print("📩 [BG] From ${message.address}: ${message.body}");
   // You can forward this to an API here if needed
 }
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // required before using async in main
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
@@ -62,6 +71,7 @@ class SmsHomePageState extends State<SmsHomePage> {
     super.initState();
     _setupSmsListener();
   }
+
 
   Future<void> _setupSmsListener() async {
     final granted = await _requestPermissions();
