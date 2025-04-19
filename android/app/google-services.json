@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "381471270564",
+    "project_id": "cell-fi",
+    "storage_bucket": "cell-fi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381471270564:android:b852b90f35dc5059b0e831",
+        "android_client_info": {
+          "package_name": "xyz.cellfi.cellfi_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvrz5sGqthSDKqMTdk16Vm7x3plMAESCk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
