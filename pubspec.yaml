@@ -38,6 +38,8 @@ dependencies:
   another_telephony: ^0.4.1
   permission_handler: ^11.3.1
   firebase_core: ^2.27.0
+  firebase_messaging: ^14.7.4
+  flutter_secure_storage: ^9.0.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../model/message.dart';
 import '../util.dart';
 
@@ -31,6 +32,7 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
     // _startMessageProcessing();
     _loadInitialMessage();
     _updateMessageCount();
+    _setupFirebaseMessaging(); // 👈 Add this
   }
 
   @override
@@ -53,6 +55,36 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
       // ✅ Trigger rebuild
       setState(() {});
     }
+  }
+
+  void _setupFirebaseMessaging() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final data = message.data;
+
+      final phoneNumber = data['phoneNumber'];
+      final messageContent = data['messageContent'];
+
+      if (phoneNumber != null && messageContent != null) {
+        sendSms(telephony, phoneNumber, messageContent);
+      } else {
+        print("❌ Missing fields: $data");
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print("📥 App opened via notification: ${message.data}");
+      // Navigate to a specific screen if needed
+      final data = message.data;
+
+      final phoneNumber = data['phoneNumber'];
+      final messageContent = data['messageContent'];
+
+      if (phoneNumber != null && messageContent != null) {
+        sendSms(telephony, phoneNumber, messageContent);
+      } else {
+        print("❌ Missing fields: $data");
+      }
+    });
   }
 
   Future<void> _startMessageProcessing() async {

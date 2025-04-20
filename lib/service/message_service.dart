@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import '../model/message.dart';
 import 'api_service.dart';
+import '../util.dart';
 
 class MessageService {
   final ApiService _apiService = ApiService();
@@ -8,19 +9,23 @@ class MessageService {
 
   /// Processes all unprocessed messages in batch.
   Future<void> processUnsentMessages() async {
-    final messagesToProcess =
-    _messageBox.values.where((msg) => !msg.processed).toList();
+    final box = await getMessageBox(); // ✅ safe access
 
-    for (final message in messagesToProcess) {
+    final messages = box.values
+        .where((msg) =>
+    !msg.processed &&
+        msg.retryCount < 2 &&
+        CommandValidator.isValidCommand(msg.body))
+        .toList();
+
+    for (final msg in messages) {
       try {
-        await _apiService.sendMessage(message.sender, message.body);
-        message.processed = true;
-        await message.save();
-        print("✅ Message processed: ${message.body}");
+        await _apiService.sendMessage(msg.sender, msg.body);
+        msg.processed = true;
+        await msg.save(); // ✅ save() is safe since msg is already from an open box
       } catch (e) {
-        message.retryCount += 1;
-        await message.save();
-        print("🔁 Retry #${message.retryCount} for message: ${message.body}");
+        msg.retryCount += 1;
+        await msg.save();
       }
     }
   }

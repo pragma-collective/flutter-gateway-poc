@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../model/message.dart';
 import '../util.dart';
 import '../service/api_service.dart';
+import 'package:cellfi_app/pages/message_detail_page.dart';
 
 class MessageListPage extends StatefulWidget {
   const MessageListPage({super.key});
@@ -74,6 +75,14 @@ class _MessageListPageState extends State<MessageListPage> {
             itemBuilder: (context, index) {
               final message = messages[index];
               return ListTile(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MessageDetailPage(message: message),
+                    ),
+                  );
+                },
                 leading: Icon(
                   message.processed
                       ? Icons.check_circle
@@ -86,11 +95,20 @@ class _MessageListPageState extends State<MessageListPage> {
                       ? Colors.orange
                       : Colors.redAccent,
                 ),
-                title: Text(message.sender),
+                title: Text(
+                  message.sender,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(message.body),
+                    Text(
+                      message.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     Text(
                       '📅 ${message.receivedAt.toLocal()}',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -100,24 +118,18 @@ class _MessageListPageState extends State<MessageListPage> {
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (!message.processed &&
-                        CommandValidator.isValidCommand(message.body)) ...[
-                      ElevatedButton(
-                        onPressed: () => _sendMessageToApi(message),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          minimumSize: const Size(60, 32),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                        ),
-                        child: const Text('Send', style: TextStyle(fontSize: 12)),
-                      ),
-                    ] else ...[
-                      Text(
-                        message.processed ? '✅ Sent' : '❌ Invalid',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                    Text('🔁 ${message.retryCount}', style: const TextStyle(fontSize: 12)),
+                    Text(
+                      message.processed
+                          ? '✅ Sent'
+                          : CommandValidator.isValidCommand(message.body)
+                          ? '⏳ Pending'
+                          : '❌ Invalid',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      '🔁 ${message.retryCount}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                   ],
                 ),
               );

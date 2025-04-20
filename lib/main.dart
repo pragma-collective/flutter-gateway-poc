@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'model/message.dart';
+import 'util.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // required before using async in main
@@ -16,6 +17,9 @@ void main() async {
   await Hive.initFlutter(dir.path);
   Hive.registerAdapter(MessageAdapter());
   await Hive.openBox<Message>('messages');
+
+  // ✅ Get and store FCM token
+  await TokenUtil.getAndStoreFcmToken(); // 👈 add this here
 
   runApp(const MyApp());
 }
