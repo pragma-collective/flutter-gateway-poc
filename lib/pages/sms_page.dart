@@ -28,7 +28,7 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _setupSmsListener();
-    _startMessageProcessing();
+    // _startMessageProcessing();
     _loadInitialMessage();
     _updateMessageCount();
   }

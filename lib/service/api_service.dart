@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://test.local.me', // Replace with your actual API
+    baseUrl: 'http://192.168.31.36:8000/api', // Replace with your actual API
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     headers: {
@@ -10,13 +10,13 @@ class ApiService {
     },
   ));
 
-  Future<void> sendMessage(String sender, String body) async {
+  Future<void> sendMessage(String phoneNumber, String message) async {
     try {
       final response = await _dio.post(
-        '/messages', // Replace with your endpoint
+        '/sms/sms.process/', // Replace with your endpoint
         data: {
-          'sender': sender,
-          'body': body,
+          'phone_number': phoneNumber,
+          'message': message
         },
       );
 
