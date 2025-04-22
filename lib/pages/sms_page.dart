@@ -1,10 +1,11 @@
 import 'package:cellfi_app/pages/message_list_page.dart';
-import 'package:cellfi_app/service/message_service.dart';
 import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cellfi_app/service/device_registration_service.dart';
+import 'package:cellfi_app/service/api_service.dart';
 import '../model/message.dart';
 import '../util.dart';
 
@@ -33,6 +34,7 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
     _loadInitialMessage();
     _updateMessageCount();
     _setupFirebaseMessaging(); // 👈 Add this
+    _initDeviceRegistration(); // ✅ async helper
   }
 
   @override
@@ -87,10 +89,14 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _startMessageProcessing() async {
-    final processor = MessageService();
-    await processor.processUnsentMessages();
+  Future<void> _initDeviceRegistration() async {
+    await ApiService().registerDevice();
   }
+
+  // Future<void> _startMessageProcessing() async {
+  //   final processor = MessageService();
+  //   await processor.processUnsentMessages();
+  // }
 
   Future<void> _updateMessageCount() async {
     final box = Hive.box<Message>('messages');

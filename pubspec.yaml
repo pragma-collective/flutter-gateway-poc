@@ -44,6 +44,7 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2
   dio: ^5.4.0
+  device_info_plus: ^9.0.3  # ✅ Last known version compatible with Java 11
 
 dev_dependencies:
   flutter_test:

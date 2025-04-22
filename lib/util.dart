@@ -2,8 +2,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../model/message.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 Future<Box<Message>> getMessageBox() async {
   if (!Hive.isBoxOpen('messages')) {
@@ -63,45 +61,6 @@ class CommandValidator {
 
   static bool isValidCommand(String message) {
     return commandPatterns.any((pattern) => pattern.hasMatch(message.trim()));
-  }
-}
-
-class TokenUtil {
-  static const _fcmTokenKey = 'fcm_token';
-  static const _secureStorage = FlutterSecureStorage();
-
-  /// Gets the current device token and stores it securely
-  static Future<String?> getAndStoreFcmToken() async {
-    try {
-      // Request permission (especially on iOS)
-      await FirebaseMessaging.instance.requestPermission();
-
-      // Get current token
-      final token = await FirebaseMessaging.instance.getToken();
-
-      if (token != null) {
-        // Store securely
-        await _secureStorage.write(key: _fcmTokenKey, value: token);
-        print("📱 FCM Token retrieved and stored: $token");
-      } else {
-        print("⚠️ Failed to retrieve FCM token.");
-      }
-
-      return token;
-    } catch (e) {
-      print("❌ Error getting FCM token: $e");
-      return null;
-    }
-  }
-
-  /// Retrieves the stored FCM token (if any)
-  static Future<String?> getStoredFcmToken() async {
-    return await _secureStorage.read(key: _fcmTokenKey);
-  }
-
-  /// Removes the stored FCM token
-  static Future<void> clearFcmToken() async {
-    await _secureStorage.delete(key: _fcmTokenKey);
   }
 }
 
