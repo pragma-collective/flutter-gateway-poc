@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../model/message.dart';
-import '../util.dart';
-import '../service/api_service.dart';
-import 'package:cellfi_app/pages/message_detail_page.dart';
+import 'package:cellfi_app/models/message.dart';
+import 'package:cellfi_app/core/services/api_service.dart';
+import 'package:cellfi_app/utils/command_validator.dart';
+import 'package:cellfi_app/screens/message_detail_screen.dart';
 
-class MessageListPage extends StatefulWidget {
-  const MessageListPage({super.key});
+class MessageListScreen extends StatefulWidget {
+  const MessageListScreen({super.key});
 
   @override
-  State<MessageListPage> createState() => _MessageListPageState();
+  State<MessageListScreen> createState() => _MessageListScreenState();
 }
 
-class _MessageListPageState extends State<MessageListPage> {
+class _MessageListScreenState extends State<MessageListScreen> {
   bool showOnlyUnprocessed = false;
 
   void toggleFilter() {
@@ -23,7 +23,7 @@ class _MessageListPageState extends State<MessageListPage> {
 
   void _sendMessageToApi(Message message) async {
     try {
-      await ApiService().sendMessage(message.sender, message.body);
+      await ApiService().sendMessage(message.body);
       message.processed = true;
       await message.save();
 
@@ -79,7 +79,7 @@ class _MessageListPageState extends State<MessageListPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => MessageDetailPage(message: message),
+                      builder: (_) => MessageDetailScreen(message: message),
                     ),
                   );
                 },
