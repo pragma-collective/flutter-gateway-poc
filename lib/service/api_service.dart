@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../util.dart';
 
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
@@ -12,10 +13,16 @@ class ApiService {
 
   Future<void> sendMessage(String phoneNumber, String message) async {
     try {
+      final token = await TokenUtil.getStoredFcmToken();
+      if (token == null) {
+        throw Exception('Missing FCM token. Cannot send message.');
+      }
+
       final response = await _dio.post(
-        '/sms/sms.process/', // Replace with your endpoint
+        '/sms/message.send/', // Replace with your endpoint
         data: {
-          'phone_number': phoneNumber,
+          'token': token,
+          'mobile': phoneNumber,
           'message': message
         },
       );
