@@ -1,21 +1,23 @@
-import 'package:cellfi_app/pages/message_list_page.dart';
-import 'package:cellfi_app/service/message_service.dart';
+import 'package:cellfi_app/screens/message_list_screen.dart';
+import 'package:cellfi_app/core/services/message_service.dart';
 import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../model/message.dart';
-import '../util.dart';
+import 'package:cellfi_app/models/message.dart';
+import 'package:cellfi_app/utils/message_util.dart';
+import 'package:cellfi_app/core/services/secure_storage_service.dart';
+import 'package:cellfi_app/widgets/phone_number_selector.dart';
 
-class SmsHomePage extends StatefulWidget {
-  const SmsHomePage({super.key});
+class SmsScreen extends StatefulWidget {
+  const SmsScreen({super.key});
 
   @override
-  SmsHomePageState createState() => SmsHomePageState();
+  SmsScreenState createState() => SmsScreenState();
 }
 
-class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
+class SmsScreenState extends State<SmsScreen> with WidgetsBindingObserver {
   String? latestSender;
   String? latestMessage;
   int totalMessages = 0;
@@ -28,6 +30,7 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
 
     WidgetsBinding.instance.addObserver(this);
 
+    _checkPhoneNumber(context);
     _setupSmsListener();
     // _startMessageProcessing();
     _loadInitialMessage();
@@ -144,6 +147,25 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
     return sms.isGranted && phone.isGranted;
   }
 
+  Future<void> _checkPhoneNumber(BuildContext context) async {
+    final storedNumber = await SecureStorageService.getPhoneNumber();
+    if (storedNumber == null || storedNumber.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => PhoneNumberSelector(
+            onSaved: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("✅ Phone number saved!")),
+              );
+            },
+          ),
+        );
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -185,7 +207,7 @@ class SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const MessageListPage(),
+                          builder: (_) => const MessageListScreen(),
                         ),
                       );
                     },

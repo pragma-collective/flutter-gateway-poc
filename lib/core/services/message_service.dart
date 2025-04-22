@@ -1,7 +1,8 @@
 import 'package:hive/hive.dart';
-import '../model/message.dart';
+import 'package:cellfi_app/models/message.dart';
 import 'api_service.dart';
-import '../util.dart';
+import 'package:cellfi_app/utils/message_util.dart';
+import 'package:cellfi_app/utils/command_validator.dart';
 
 class MessageService {
   final ApiService _apiService = ApiService();
@@ -20,7 +21,7 @@ class MessageService {
 
     for (final msg in messages) {
       try {
-        await _apiService.sendMessage(msg.sender, msg.body);
+        await _apiService.sendMessage(msg.body);
         msg.processed = true;
         await msg.save(); // ✅ save() is safe since msg is already from an open box
       } catch (e) {

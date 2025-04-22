@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:cellfi_app/model/message.dart';
-import 'package:cellfi_app/service/api_service.dart';
-import 'package:cellfi_app/util.dart';
+import 'package:cellfi_app/models/message.dart';
+import 'package:cellfi_app/core/services/api_service.dart';
+import 'package:cellfi_app/utils/command_validator.dart';
 
-class MessageDetailPage extends StatefulWidget {
+class MessageDetailScreen extends StatefulWidget {
   final Message message;
 
-  const MessageDetailPage({super.key, required this.message});
+  const MessageDetailScreen({super.key, required this.message});
 
   @override
-  State<MessageDetailPage> createState() => _MessageDetailPageState();
+  State<MessageDetailScreen> createState() => _MessageDetailPageState();
 }
 
-class _MessageDetailPageState extends State<MessageDetailPage> {
+class _MessageDetailPageState extends State<MessageDetailScreen> {
   bool _isSending = false;
   String? _apiResponse;
 
@@ -23,7 +23,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     });
 
     try {
-      await ApiService().sendMessage(widget.message.sender, widget.message.body);
+      await ApiService().sendMessage(widget.message.body);
       widget.message.processed = true;
       await widget.message.save();
 
