@@ -12,11 +12,14 @@ import 'package:cellfi_app/utils/isar_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await IsarHelper.initIsar(); // replaces HiveHelper.initHive()
+  // Initialize Isar only once
+  await IsarHelper.initIsar();
 
   final apiToken = await TokenUtil.getApiToken();
   debugPrint(apiToken);
@@ -25,36 +28,16 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DeviceRegistrationProvider()),
+        // Initialize MessageProvider at app startup to ensure single initialization flow
+        ChangeNotifierProvider(create: (_) => MessageProvider()..loadMessages()),
       ],
-      child: const InitWrapper(), // ✅ Isar + MessageProvider initialized inside
+      child: const CellFiApp(),
     ),
   );
 }
 
-class InitWrapper extends StatelessWidget {
-  const InitWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: IsarHelper.initIsar(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const MaterialApp(
-            home: Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
-          );
-        }
-
-        return ChangeNotifierProvider(
-          create: (_) => MessageProvider()..loadMessages(),
-          child: const CellFiApp(),
-        );
-      },
-    );
-  }
-}
+// Removed InitWrapper class as it's no longer needed
+// MessageProvider is now initialized in the MultiProvider in main()
 
 class CellFiApp extends StatelessWidget {
   const CellFiApp({super.key});
@@ -100,4 +83,3 @@ class CellFiApp extends StatelessWidget {
     );
   }
 }
-

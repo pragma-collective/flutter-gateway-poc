@@ -1,6 +1,5 @@
 import 'package:another_telephony/telephony.dart';
 import 'package:isar/isar.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:cellfi_app/models/message.dart';
 import 'package:cellfi_app/utils/isar_helper.dart';
 
@@ -25,16 +24,23 @@ Future<void> handleIncomingMessage(Isar isar, String sender, String body) async 
   // }
 }
 
-/// Handle SMS when received in the background (must be a top-level function)
+// For SMS sending
+Future<void> sendSms(Telephony telephony, String phoneNumber, String messageContent) async {
+  try {
+    await telephony.sendSms(
+      to: phoneNumber,
+      message: messageContent,
+    );
+  } catch (e) {
+    print('Error sending SMS: $e');
+  }
+}
+
+// Safe background message handler
 @pragma('vm:entry-point')
 Future<void> backgroundMessageHandler(SmsMessage message) async {
-  final dir = await getApplicationDocumentsDirectory();
-  final isar = await Isar.open(
-    [MessageSchema],
-    directory: dir.path,
-    inspector: false, // disable in background
-    name: 'default'
-  );
+  // Initialize Isar first - this is safe to call multiple times
+  await IsarHelper.initIsar();
 
   final newMsg = Message()
     ..sender = message.address ?? 'Unknown'
@@ -43,22 +49,17 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
     ..processed = false
     ..retryCount = 0;
 
-  await isar.writeTxn(() async {
-    await isar.messages.put(newMsg);
-  });
+  try {
+    final isar = IsarHelper.getIsarInstance();
+    await isar.writeTxn(() async {
+      await isar.messages.put(newMsg);
+    });
 
-  await isar.close(); // Optional: close to free resources
-}
-
-Future<void> sendSms(Telephony telephony, String phoneNumber, String messageContent) async {
-  final permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
-  if (permissionsGranted ?? false) {
-    telephony.sendSms(
-      to: phoneNumber,
-      message: messageContent,
-    );
-    print("📤 SMS sent to \$phoneNumber");
-  } else {
-    print("❌ SMS permission not granted");
+    // Ensure we close Isar properly after a background operation
+    await IsarHelper.closeIsar();
+  } catch (e) {
+    print('Error in background message handler: $e');
+    // Try to close Isar even if there was an error
+    await IsarHelper.closeIsar();
   }
 }

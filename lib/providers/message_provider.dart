@@ -1,55 +1,97 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:cellfi_app/models/message.dart';
-import 'package:cellfi_app/utils/isar_helper.dart';
+import '../models/message.dart';
+import '../utils/isar_helper.dart';
 
 class MessageProvider extends ChangeNotifier {
-  Isar? _isar;
+  bool _isLoading = true;
   List<Message> _messages = [];
-  bool _loading = true;
 
+  bool get isLoading => _isLoading;
   List<Message> get messages => _messages;
-  bool get isLoading => _loading;
 
-  Future<void> _ensureIsarInitialized() async {
-    if (_isar != null) return;
-
-    final dir = await getApplicationDocumentsDirectory();
-    _isar ??= IsarHelper.getIsarInstance(); // ✅ Use the initialized instance
-  }
-
+  /// Load messages from Isar database
   Future<void> loadMessages() async {
-    _loading = true;
+    _isLoading = true;
     notifyListeners();
 
-    await _ensureIsarInitialized();
+    try {
+      // Make sure Isar is initialized
+      await IsarHelper.initialized;
 
-    final query = _isar!.messages
-        .where()
-        .sortByReceivedAtDesc();
+      final isar = IsarHelper.getIsarInstance();
+      _messages = await isar.messages.where().sortByReceivedAtDesc().findAll();
 
-    _messages = await query.findAll();
-    _loading = false;
-    notifyListeners();
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint("💥 Error loading messages: $e");
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  Future<void> refresh() async => loadMessages();
+  /// Force refresh the message list
+  Future<void> refresh() async {
+    try {
+      // Make sure Isar is initialized
+      await IsarHelper.initialized;
 
-  Future<void> markAsProcessed(Message message) async {
-    if (_isar == null) await _ensureIsarInitialized();
-    await _isar!.writeTxn(() async {
-      message.processed = true;
-      await _isar!.messages.put(message);
-    });
-    await refresh();
+      final isar = IsarHelper.getIsarInstance();
+      _messages = await isar.messages.where().sortByReceivedAtDesc().findAll();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("💥 Error refreshing messages: $e");
+    }
   }
 
+  /// Watch messages stream for real-time updates
   Stream<List<Message>> watchMessages() {
-    _isar ??= Isar.getInstance('default');
-    return _isar!.messages
-        .where()
-        .sortByReceivedAtDesc()
-        .watch(fireImmediately: true);
+    try {
+      final isar = IsarHelper.getIsarInstance();
+      return isar.messages.where().sortByReceivedAtDesc().watch(fireImmediately: true);
+    } catch (e) {
+      debugPrint("💥 Error watching messages: $e");
+      return Stream.value([]);
+    }
+  }
+
+  /// Add a new message
+  Future<void> addMessage(Message message) async {
+    try {
+      final isar = IsarHelper.getIsarInstance();
+      await isar.writeTxn(() async {
+        await isar.messages.put(message);
+      });
+      await refresh();
+    } catch (e) {
+      debugPrint("💥 Error adding message: $e");
+    }
+  }
+
+  /// Update a message
+  Future<void> updateMessage(Message message) async {
+    try {
+      final isar = IsarHelper.getIsarInstance();
+      await isar.writeTxn(() async {
+        await isar.messages.put(message);
+      });
+      await refresh();
+    } catch (e) {
+      debugPrint("💥 Error updating message: $e");
+    }
+  }
+
+  /// Delete a message
+  Future<void> deleteMessage(int id) async {
+    try {
+      final isar = IsarHelper.getIsarInstance();
+      await isar.writeTxn(() async {
+        await isar.messages.delete(id);
+      });
+      await refresh();
+    } catch (e) {
+      debugPrint("💥 Error deleting message: $e");
+    }
   }
 }
