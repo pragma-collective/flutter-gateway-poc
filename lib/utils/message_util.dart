@@ -1,54 +1,53 @@
 import 'package:another_telephony/telephony.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cellfi_app/models/message.dart';
-
-/// Open Hive box safely for messages
-Future<Box<Message>> getMessageBox() async {
-  if (!Hive.isBoxOpen('messages')) {
-    return await Hive.openBox<Message>('messages');
-  }
-  return Hive.box<Message>('messages');
-}
+import 'package:cellfi_app/utils/isar_helper.dart';
 
 /// Handle foreground incoming messages
-Future<void> handleIncomingMessage(String sender, String body) async {
-  final box = await getMessageBox();
+Future<void> handleIncomingMessage(Isar isar, String sender, String body) async {
+  final newMessage = Message()
+    ..sender = sender
+    ..body = body
+    ..receivedAt = DateTime.now()
+    ..processed = false
+    ..retryCount = 0;
 
-  await box.add(Message(
-    sender: sender,
-    body: body,
-    receivedAt: DateTime.now(),
-    processed: false,
-    retryCount: 0,
-  ));
+  await isar.writeTxn(() async {
+    await isar.messages.put(newMessage);
+  });
 
   // if (CommandValidator.isValidCommand(body)) {
   //   final processor = MessageService();
-  //   await processor.processUnsentMessages();
+  //   await processor.processUnsentMessages(isar);
   // } else {
-  //   print("❌ Ignored non-command message: $body");
+  //   print("❌ Ignored non-command message: \$body");
   // }
 }
 
 /// Handle SMS when received in the background (must be a top-level function)
 @pragma('vm:entry-point')
-void backgroundMessageHandler(SmsMessage message) async {
+Future<void> backgroundMessageHandler(SmsMessage message) async {
   final dir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(dir.path);
-  Hive.registerAdapter(MessageAdapter());
-  await Hive.openBox<Message>('messages');
+  final isar = await Isar.open(
+    [MessageSchema],
+    directory: dir.path,
+    inspector: false, // disable in background
+    name: 'default'
+  );
 
-  await Hive.box<Message>('messages').add(Message(
-    sender: message.address ?? 'Unknown',
-    body: message.body ?? '',
-    receivedAt: DateTime.now(),
-    processed: false,
-    retryCount: 0,
-  ));
+  final newMsg = Message()
+    ..sender = message.address ?? 'Unknown'
+    ..body = message.body ?? ''
+    ..receivedAt = DateTime.now()
+    ..processed = false
+    ..retryCount = 0;
 
-  // final processor = MessageService();
-  // await processor.processUnsentMessages();
+  await isar.writeTxn(() async {
+    await isar.messages.put(newMsg);
+  });
+
+  await isar.close(); // Optional: close to free resources
 }
 
 Future<void> sendSms(Telephony telephony, String phoneNumber, String messageContent) async {
@@ -58,7 +57,7 @@ Future<void> sendSms(Telephony telephony, String phoneNumber, String messageCont
       to: phoneNumber,
       message: messageContent,
     );
-    print("📤 SMS sent to $phoneNumber");
+    print("📤 SMS sent to \$phoneNumber");
   } else {
     print("❌ SMS permission not granted");
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cellfi_app/models/message.dart';
 import 'package:cellfi_app/core/services/api_service.dart';
 import 'package:cellfi_app/utils/command_validator.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
 
 class MessageDetailScreen extends StatefulWidget {
   final Message message;
@@ -24,8 +25,12 @@ class _MessageDetailPageState extends State<MessageDetailScreen> {
 
     try {
       await ApiService().sendMessage(widget.message.body);
-      widget.message.processed = true;
-      await widget.message.save();
+
+      final isar = IsarHelper.getIsarInstance();
+      await isar.writeTxn(() async {
+        widget.message.processed = true;
+        await isar.messages.put(widget.message);
+      });
 
       setState(() {
         _apiResponse = "✅ Message sent successfully!";

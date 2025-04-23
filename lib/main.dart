@@ -4,37 +4,60 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'models/message.dart';
 import 'routes/app_route.dart';
-
-
-
+import 'utils/token_util.dart';
 import 'package:cellfi_app/providers/device_registration_provider.dart';
+import 'package:cellfi_app/providers/message_provider.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // required before using async in main
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final dir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(dir.path);
-  Hive.registerAdapter(MessageAdapter());
-  await Hive.openBox<Message>('messages');
+  await IsarHelper.initIsar(); // replaces HiveHelper.initHive()
 
+  final apiToken = await TokenUtil.getApiToken();
+  debugPrint(apiToken);
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => DeviceRegistrationProvider()..register(),
-      child: const MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DeviceRegistrationProvider()),
+      ],
+      child: const InitWrapper(), // ✅ Isar + MessageProvider initialized inside
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class InitWrapper extends StatelessWidget {
+  const InitWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: IsarHelper.initIsar(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        return ChangeNotifierProvider(
+          create: (_) => MessageProvider()..loadMessages(),
+          child: const CellFiApp(),
+        );
+      },
+    );
+  }
+}
+
+class CellFiApp extends StatelessWidget {
+  const CellFiApp({super.key});
 
   // This widget is the root of your application.
   @override
@@ -45,7 +68,31 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      initialRoute: AppRoutes.registerDevice,
+      home: FutureBuilder<String?>(
+        future: TokenUtil.getApiToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final token = snapshot.data;
+          return Consumer<MessageProvider>(
+            builder: (context, provider, _) {
+              if (provider.isLoading) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              return (token != null && token.isNotEmpty)
+                  ? const SmsScreen()
+                  : const RegisterDeviceScreen();
+            },
+          );
+        },
+      ),
       routes: {
         AppRoutes.registerDevice: (_) => const RegisterDeviceScreen(),
         AppRoutes.smsScreen: (_) => const SmsScreen(),

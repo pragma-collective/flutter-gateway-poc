@@ -1,45 +1,51 @@
-import 'package:hive/hive.dart';
+import 'package:isar/isar.dart';
 import 'package:cellfi_app/models/message.dart';
 import 'api_service.dart';
-import 'package:cellfi_app/utils/message_util.dart';
 import 'package:cellfi_app/utils/command_validator.dart';
 
 class MessageService {
   final ApiService _apiService = ApiService();
-  final Box<Message> _messageBox = Hive.box<Message>('messages');
 
   /// Processes all unprocessed messages in batch.
-  Future<void> processUnsentMessages() async {
-    final box = await getMessageBox(); // ✅ safe access
+  Future<void> processUnsentMessages(Isar isar) async {
+    final messages = await isar.messages
+        .filter()
+        .processedEqualTo(false)
+        .retryCountLessThan(2)
+        .findAll();
 
-    final messages = box.values
-        .where((msg) =>
-    !msg.processed &&
-        msg.retryCount < 2 &&
-        CommandValidator.isValidCommand(msg.body))
+    final validMessages = messages
+        .where((msg) => CommandValidator.isValidCommand(msg.body))
         .toList();
 
-    for (final msg in messages) {
+    for (final msg in validMessages) {
       try {
         await _apiService.sendMessage(msg.body);
-        msg.processed = true;
-        await msg.save(); // ✅ save() is safe since msg is already from an open box
+        await isar.writeTxn(() async {
+          msg.processed = true;
+          await isar.messages.put(msg);
+        });
       } catch (e) {
-        msg.retryCount += 1;
-        await msg.save();
+        await isar.writeTxn(() async {
+          msg.retryCount += 1;
+          await isar.messages.put(msg);
+        });
       }
     }
   }
 
   /// Optional cleanup for failed messages
-  Future<void> deleteFailedMessages({int retryLimit = 3}) async {
-    final failedMessages = _messageBox.values
-        .where((msg) => msg.retryCount >= retryLimit)
-        .toList();
+  Future<void> deleteFailedMessages(Isar isar, {int retryLimit = 3}) async {
+    final failedMessages = await isar.messages
+        .filter()
+        .retryCountGreaterThan(retryLimit)
+        .findAll();
 
-    for (final msg in failedMessages) {
-      await msg.delete();
-      print("🗑️ Deleted message after $retryLimit retries: ${msg.body}");
-    }
+    await isar.writeTxn(() async {
+      for (final msg in failedMessages) {
+        await isar.messages.delete(msg.id);
+        print("🗑️ Deleted message after $retryLimit retries: ${msg.body}");
+      }
+    });
   }
 }
