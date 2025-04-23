@@ -12,30 +12,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _initialize();
-  }
-
-  void _initialize() async {
-    final provider = Provider.of<DeviceRegistrationProvider>(context, listen: false);
-    await provider.register();
-
-    if (!mounted) return;
-
-    if (provider.error != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => ErrorScreen(message: provider.error!)),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SmsScreen()), // 👈 Show SMS page
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

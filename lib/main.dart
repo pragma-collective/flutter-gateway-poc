@@ -1,4 +1,5 @@
-import 'package:cellfi_app/screens/splash_screen.dart';
+import 'package:cellfi_app/screens/sms_screen.dart';
+import 'package:cellfi_app/screens/register_device.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +7,9 @@ import 'firebase_options.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'models/message.dart';
+import 'routes/app_route.dart';
+
+
 
 import 'package:cellfi_app/providers/device_registration_provider.dart';
 
@@ -41,7 +45,11 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const SplashScreen(),
+      initialRoute: AppRoutes.registerDevice,
+      routes: {
+        AppRoutes.registerDevice: (_) => const RegisterDeviceScreen(),
+        AppRoutes.smsScreen: (_) => const SmsScreen(),
+      },
     );
   }
 }
