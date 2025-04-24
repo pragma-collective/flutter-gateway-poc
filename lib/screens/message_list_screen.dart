@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cellfi_app/models/message.dart';
 import 'package:cellfi_app/core/services/api_service.dart';
 import 'package:cellfi_app/utils/command_validator.dart';
 import 'package:cellfi_app/screens/message_detail_screen.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
+import 'package:isar/isar.dart';
 
 class MessageListScreen extends StatefulWidget {
   const MessageListScreen({super.key});
@@ -21,11 +22,14 @@ class _MessageListScreenState extends State<MessageListScreen> {
     });
   }
 
-  void _sendMessageToApi(Message message) async {
+  Future<void> _sendMessageToApi(Message message) async {
     try {
       await ApiService().sendMessage(message.body);
-      message.processed = true;
-      await message.save();
+      final isar = IsarHelper.getIsarInstance();
+      await isar.writeTxn(() async {
+        message.processed = true;
+        await isar.messages.put(message);
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -39,10 +43,18 @@ class _MessageListScreenState extends State<MessageListScreen> {
     }
   }
 
+  Stream<List<Message>> watchMessages() {
+    final isar = IsarHelper.getIsarInstance();
+    final query = isar.messages
+        .filter()
+        .optional(showOnlyUnprocessed, (q) => q.processedEqualTo(false))
+        .sortByReceivedAtDesc()
+        .build();
+    return query.watch(fireImmediately: true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final messageBox = Hive.box<Message>('messages');
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('📄 Stored Messages'),
@@ -56,15 +68,14 @@ class _MessageListScreenState extends State<MessageListScreen> {
           )
         ],
       ),
-      body: ValueListenableBuilder(
-        valueListenable: messageBox.listenable(),
-        builder: (context, Box<Message> box, _) {
-          List<Message> messages = box.values.toList().cast<Message>();
-
-          if (showOnlyUnprocessed) {
-            messages = messages.where((msg) => !msg.processed).toList();
+      body: StreamBuilder<List<Message>>(
+        stream: watchMessages(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
           }
 
+          final messages = snapshot.data!;
           if (messages.isEmpty) {
             return const Center(child: Text('No messages found.'));
           }

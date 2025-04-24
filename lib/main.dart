@@ -1,36 +1,46 @@
-import 'package:cellfi_app/screens/splash_screen.dart';
+import 'package:cellfi_app/screens/sms_screen.dart';
+import 'package:cellfi_app/screens/register_device.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'models/message.dart';
-
+import 'routes/app_route.dart';
+import 'utils/token_util.dart';
 import 'package:cellfi_app/providers/device_registration_provider.dart';
+import 'package:cellfi_app/providers/message_provider.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // required before using async in main
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final dir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(dir.path);
-  Hive.registerAdapter(MessageAdapter());
-  await Hive.openBox<Message>('messages');
+  // Initialize Isar only once
+  await IsarHelper.initIsar();
 
+  final apiToken = await TokenUtil.getApiToken();
+  debugPrint(apiToken);
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => DeviceRegistrationProvider()..register(),
-      child: const MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DeviceRegistrationProvider()),
+        // Initialize MessageProvider at app startup to ensure single initialization flow
+        ChangeNotifierProvider(create: (_) => MessageProvider()..loadMessages()),
+      ],
+      child: const CellFiApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+// Removed InitWrapper class as it's no longer needed
+// MessageProvider is now initialized in the MultiProvider in main()
+
+class CellFiApp extends StatelessWidget {
+  const CellFiApp({super.key});
 
   // This widget is the root of your application.
   @override
@@ -41,8 +51,35 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const SplashScreen(),
+      home: FutureBuilder<String?>(
+        future: TokenUtil.getApiToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final token = snapshot.data;
+          return Consumer<MessageProvider>(
+            builder: (context, provider, _) {
+              if (provider.isLoading) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              return (token != null && token.isNotEmpty)
+                  ? const SmsScreen()
+                  : const RegisterDeviceScreen();
+            },
+          );
+        },
+      ),
+      routes: {
+        AppRoutes.registerDevice: (_) => const RegisterDeviceScreen(),
+        AppRoutes.smsScreen: (_) => const SmsScreen(),
+      },
     );
   }
 }
-

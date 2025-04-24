@@ -1,29 +1,15 @@
-import 'package:hive/hive.dart';
+import 'package:isar/isar.dart';
 
 part 'message.g.dart';
 
-@HiveType(typeId: 0)
-class Message extends HiveObject {
-  @HiveField(0)
+@collection
+class Message {
+  Id id = Isar.autoIncrement;
+
   late String sender;
-
-  @HiveField(1)
   late String body;
-
-  @HiveField(2)
   late DateTime receivedAt;
 
-  @HiveField(3)
-  late bool processed;
-
-  @HiveField(4)
-  late int retryCount;
-
-  Message({
-    required this.sender,
-    required this.body,
-    required this.receivedAt,
-    this.processed = false,
-    this.retryCount = 0,
-  });
+  bool processed = false;
+  int retryCount = 0;
 }
