@@ -24,7 +24,7 @@ class _MessageListScreenState extends State<MessageListScreen> {
 
   Future<void> _sendMessageToApi(Message message) async {
     try {
-      await ApiService().sendMessage(message.body);
+      await ApiService().sendMessage(message.sender, message.body);
       final isar = IsarHelper.getIsarInstance();
       await isar.writeTxn(() async {
         message.processed = true;

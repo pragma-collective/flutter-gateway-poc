@@ -20,7 +20,7 @@ class MessageService {
 
     for (final msg in validMessages) {
       try {
-        await _apiService.sendMessage(msg.body);
+        await _apiService.sendMessage(msg.sender, msg.body);
         await isar.writeTxn(() async {
           msg.processed = true;
           await isar.messages.put(msg);

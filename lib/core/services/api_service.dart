@@ -14,7 +14,7 @@ class ApiService {
     final apiToken = await TokenUtil.getApiToken();
     if (apiToken == null) {
       throw Exception(
-        "❌ No API token found. Please register device.");
+          "❌ No API token found. Please register device.");
     }
 
     final dio = Dio(BaseOptions(
@@ -23,7 +23,7 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 10),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiToken', // ✅ Inject token
+        'X-API-Key': apiToken, // 🔄 Changed from Bearer token to X-API-Key
       },
     ));
 
@@ -35,7 +35,7 @@ class ApiService {
   Future<void> registerDevice() async {
     final fcmToken = await TokenUtil.fetchAndStoreFcmToken();
     final deviceId = await DeviceUtil.getDeviceId();
-    final phoneNumber = await SecureStorageService.getPhoneNumber(); // 👈 added
+    final phoneNumber = await SecureStorageService.getPhoneNumber();
 
     if (fcmToken == null) throw Exception('Missing FCM token');
     if (deviceId == null) throw Exception('Missing device ID');
@@ -65,17 +65,9 @@ class ApiService {
   }
 
   /// Sends a message using the authenticated Dio instance
-  Future<void> sendMessage(String message) async {
+  Future<void> sendMessage(String phoneNumber, String message) async {
     try {
-      final fcmToken = await TokenUtil.getStoredFcmToken();
-      final deviceId = await DeviceUtil.getDeviceId();
-      final phoneNumber = await SecureStorageService.getPhoneNumber(); // 👈 added
-
-      if (fcmToken == null || deviceId == null) {
-        throw Exception('Missing FCM token or Device ID');
-      }
-
-      final dio = await _getAuthenticatedDio(); // 👈 use auth-enabled client
+      final dio = await _getAuthenticatedDio(); // Use auth-enabled client
 
       final response = await dio.post('/sms/message.send/', data: {
         'mobile': phoneNumber,

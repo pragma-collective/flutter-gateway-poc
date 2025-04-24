@@ -24,7 +24,7 @@ class _MessageDetailPageState extends State<MessageDetailScreen> {
     });
 
     try {
-      await ApiService().sendMessage(widget.message.body);
+      await ApiService().sendMessage(widget.message.sender, widget.message.body);
 
       final isar = IsarHelper.getIsarInstance();
       await isar.writeTxn(() async {
