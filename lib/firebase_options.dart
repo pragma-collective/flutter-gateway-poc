@@ -53,10 +53,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAvrz5sGqthSDKqMTdk16Vm7x3plMAESCk',
-    appId: '1:381471270564:android:b852b90f35dc5059b0e831',
-    messagingSenderId: '381471270564',
-    projectId: 'cell-fi',
-    storageBucket: 'cell-fi.firebasestorage.app',
+    apiKey: 'AIzaSyDM3iDv0K-cRntOHuBA9qB9pD3Nd-n9UAs',
+    appId: '1:353128480772:android:4ea34814c4906633b8f551',
+    messagingSenderId: '353128480772',
+    projectId: 'cellfi-88e67',
+    storageBucket: 'cellfi-88e67.firebasestorage.app',
   );
+
 }

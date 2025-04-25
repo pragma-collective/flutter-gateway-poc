@@ -3,14 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'package:cellfi_app/models/message.dart';
 import 'package:cellfi_app/utils/isar_helper.dart';
 import 'package:cellfi_app/utils/message_util.dart';
 import 'package:cellfi_app/core/services/secure_storage_service.dart';
 import 'package:cellfi_app/screens/message_detail_screen.dart';
-import 'package:cellfi_app/providers/message_provider.dart'; // your new provider
+import 'package:cellfi_app/providers/message_provider.dart';
 
 class SmsScreen extends StatefulWidget {
   const SmsScreen({super.key});
@@ -29,12 +28,12 @@ class SmsScreenState extends State<SmsScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _loadPhoneNumber();
     _setupSmsListener();
-    _setupFirebaseMessaging();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Clean up Firebase listeners when the screen is disposed
     super.dispose();
   }
 
@@ -54,28 +53,6 @@ class SmsScreenState extends State<SmsScreen> with WidgetsBindingObserver {
   Future<void> _loadPhoneNumber() async {
     final number = await SecureStorageService.getPhoneNumber();
     setState(() => _phoneNumber = number);
-  }
-
-  void _setupFirebaseMessaging() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final data = message.data;
-      final phoneNumber = data['phoneNumber'];
-      final messageContent = data['messageContent'];
-
-      if (phoneNumber != null && messageContent != null) {
-        sendSms(telephony, phoneNumber, messageContent);
-      }
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      final data = message.data;
-      final phoneNumber = data['phoneNumber'];
-      final messageContent = data['messageContent'];
-
-      if (phoneNumber != null && messageContent != null) {
-        sendSms(telephony, phoneNumber, messageContent);
-      }
-    });
   }
 
   Future<void> _handleSms(SmsMessage message) async {

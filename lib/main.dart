@@ -3,12 +3,14 @@ import 'package:cellfi_app/screens/register_device.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:another_telephony/telephony.dart';
 import 'firebase_options.dart';
 import 'routes/app_route.dart';
 import 'utils/token_util.dart';
 import 'package:cellfi_app/providers/device_registration_provider.dart';
 import 'package:cellfi_app/providers/message_provider.dart';
 import 'package:cellfi_app/utils/isar_helper.dart';
+import 'package:cellfi_app/utils/firebase_util.dart'; // Import the new utility
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +23,14 @@ void main() async {
   // Initialize Isar only once
   await IsarHelper.initIsar();
 
+  // Initialize Telephony instance
+  final telephony = Telephony.instance;
+
+  // Initialize Firebase Messaging utility
+  await FirebaseUtil.initialize(telephony);
+
   final apiToken = await TokenUtil.getApiToken();
-  debugPrint(apiToken);
+  debugPrint("API Token: $apiToken");
 
   runApp(
     MultiProvider(
@@ -35,9 +43,6 @@ void main() async {
     ),
   );
 }
-
-// Removed InitWrapper class as it's no longer needed
-// MessageProvider is now initialized in the MultiProvider in main()
 
 class CellFiApp extends StatelessWidget {
   const CellFiApp({super.key});
