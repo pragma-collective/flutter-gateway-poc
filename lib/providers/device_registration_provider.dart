@@ -6,6 +6,7 @@ class DeviceRegistrationProvider with ChangeNotifier {
 
   bool isLoading = true;
   String? error;
+  String _baseUrl = '';
 
   Future<void> register() async {
     try {
@@ -16,5 +17,20 @@ class DeviceRegistrationProvider with ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  void updateConfig({
+    String? baseUrl,
+    // Other optional parameters as needed
+  }) {
+    if (baseUrl != null && baseUrl != _baseUrl) {
+      _baseUrl = baseUrl;
+      // Update any API client or service that needs the new URL
+    }
+
+    // Update other config parameters similarly
+
+    // Notify listeners if needed
+    notifyListeners();
   }
 }

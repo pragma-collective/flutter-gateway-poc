@@ -85,9 +85,8 @@ class ApiService {
   Future<void> sendMessage(String phoneNumber, String message) async {
     try {
       final dio = await _getAuthenticatedDio(); // Use auth-enabled client
-
       final response = await dio.post('/sms/message.send/', data: {
-        'mobile': phoneNumber,
+        'phone_number': phoneNumber,
         'message': message,
       });
 
