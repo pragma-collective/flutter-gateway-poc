@@ -25,7 +25,6 @@ class ApiService {
           "❌ No Base URL found.");
     }
 
-    print('BaseURL: $baseUrl');
     final dio = Dio(BaseOptions(
       baseUrl: '$baseUrl/api',
       connectTimeout: const Duration(seconds: 10),
