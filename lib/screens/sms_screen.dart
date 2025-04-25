@@ -10,6 +10,7 @@ import 'package:cellfi_app/utils/message_util.dart';
 import 'package:cellfi_app/core/services/secure_storage_service.dart';
 import 'package:cellfi_app/screens/message_detail_screen.dart';
 import 'package:cellfi_app/providers/message_provider.dart';
+import 'package:cellfi_app/widgets/api_base_url_selector.dart';
 
 class SmsScreen extends StatefulWidget {
   const SmsScreen({super.key});
@@ -92,6 +93,16 @@ class SmsScreenState extends State<SmsScreen> with WidgetsBindingObserver {
         return Scaffold(
           appBar: AppBar(
             title: const Text('📨 Messages'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.api),
+                tooltip: 'Set API Base URL',
+                onPressed: () {
+                  // Open modal dialog instead of navigating to a new page
+                  ApiBaseUrlDialog.show(context);
+                },
+              ),
+            ],
           ),
           body: StreamBuilder<List<Message>>(
             stream: provider.watchMessages(),

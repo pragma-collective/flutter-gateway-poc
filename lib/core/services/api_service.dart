@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../utils/token_util.dart';
 import '../../utils/device_util.dart';
+import '../../utils/api_base_url_util.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cellfi_app/core/services/secure_storage_service.dart';
 
@@ -17,8 +18,15 @@ class ApiService {
           "❌ No API token found. Please register device.");
     }
 
+    final apiConfig = ApiUrlConfig();
+    final baseUrl = await apiConfig.getBaseUrl();
+    if (baseUrl == '') {
+      throw Exception(
+          "❌ No Base URL found.");
+    }
+
     final dio = Dio(BaseOptions(
-      baseUrl: 'http://192.168.31.36:8000/api',
+      baseUrl: '$baseUrl/api',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
@@ -37,11 +45,20 @@ class ApiService {
     final deviceId = await DeviceUtil.getDeviceId();
     final phoneNumber = await SecureStorageService.getPhoneNumber();
 
+    final apiConfig = ApiUrlConfig();
+    final baseUrl = await apiConfig.getBaseUrl();
+    if (baseUrl == '') {
+      throw Exception(
+          "❌ No Base URL found.");
+    }
+
+
+
     if (fcmToken == null) throw Exception('Missing FCM token');
     if (deviceId == null) throw Exception('Missing device ID');
 
     final dio = Dio(BaseOptions(
-      baseUrl: 'http://192.168.31.36:8000/api',
+      baseUrl: '$baseUrl/api',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
