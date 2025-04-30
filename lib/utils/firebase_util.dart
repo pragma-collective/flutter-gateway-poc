@@ -4,6 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cellfi_app/core/services/periodic_worker_service.dart';
+
+// Set to track processed FCM message IDs to avoid duplicates
+final Set<String> _processedMessageIds = <String>{};
 
 // This must be a top-level function
 @pragma('vm:entry-point')
@@ -12,6 +16,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
   print('Background message received: ${message.data}');
+
+  // Check if we've already processed this message
+  final messageId = message.messageId ?? 'unknown';
+  if (_processedMessageIds.contains(messageId)) {
+    print('⏭️ Already processed FCM message: $messageId, skipping');
+    return;
+  }
+
+  // Mark as processed
+  _processedMessageIds.add(messageId);
 
   // Store message for processing when app is active
   final prefs = await SharedPreferences.getInstance();
@@ -27,12 +41,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await prefs.setStringList('pending_messages', messagesJson);
     print('Message stored for later processing: $phoneNumber - $messageContent');
   }
+
+  // We'll intentionally avoid triggering message processing here
+  // to prevent duplicate processing. Instead, we'll let the app
+  // handle processing when it resumes.
+  print('✅ Background message stored for later processing');
 }
 
 class FirebaseUtil {
   static StreamSubscription<RemoteMessage>? _foregroundSubscription;
   static StreamSubscription<RemoteMessage>? _openedAppSubscription;
   static bool _isInitialized = false;
+
+  // Timestamps to track when processing was last triggered
+  static DateTime? _lastProcessingTime;
+  static const Duration _minProcessingInterval = Duration(seconds: 5);
 
   // Initialize Firebase Messaging
   static Future<void> initialize(Telephony telephony) async {
@@ -92,14 +115,44 @@ class FirebaseUtil {
       print("FOREGROUND MESSAGE RECEIVED ======================");
       print("Message ID: ${message.messageId}");
       print("Message data: ${message.data}");
+
+      // Check if we've already processed this message
+      final messageId = message.messageId ?? 'unknown';
+      if (_processedMessageIds.contains(messageId)) {
+        print('⏭️ Already processed FCM message: $messageId, skipping');
+        return;
+      }
+
+      // Mark as processed
+      _processedMessageIds.add(messageId);
+
+      // Process the message
       _processMessage(message, telephony);
+
+      // Trigger SMS processing, but with rate limiting
+      _triggerProcessingWithRateLimit();
     });
 
     // Handle when app is opened from notification
     _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("APP OPENED FROM NOTIFICATION ======================");
       print("Message data: ${message.data}");
+
+      // Check if we've already processed this message
+      final messageId = message.messageId ?? 'unknown';
+      if (_processedMessageIds.contains(messageId)) {
+        print('⏭️ Already processed FCM message: $messageId, skipping');
+        return;
+      }
+
+      // Mark as processed
+      _processedMessageIds.add(messageId);
+
+      // Process the message
       _processMessage(message, telephony);
+
+      // Trigger SMS processing, but with rate limiting
+      _triggerProcessingWithRateLimit();
     });
 
     // Check for initial message (app opened from terminated state)
@@ -107,11 +160,49 @@ class FirebaseUtil {
       if (message != null) {
         print("APP STARTED FROM TERMINATED STATE VIA NOTIFICATION ======================");
         print("Message data: ${message.data}");
+
+        // Check if we've already processed this message
+        final messageId = message.messageId ?? 'unknown';
+        if (_processedMessageIds.contains(messageId)) {
+          print('⏭️ Already processed FCM message: $messageId, skipping');
+          return;
+        }
+
+        // Mark as processed
+        _processedMessageIds.add(messageId);
+
+        // Process the message
         _processMessage(message, telephony);
+
+        // Trigger SMS processing, but with rate limiting
+        _triggerProcessingWithRateLimit();
       }
     });
 
     print("Firebase Messaging listeners setup complete");
+  }
+
+  // Trigger message processing with rate limiting
+  static Future<void> _triggerProcessingWithRateLimit() async {
+    final now = DateTime.now();
+
+    // Check if we've processed recently
+    if (_lastProcessingTime != null) {
+      final timeSinceLastProcessing = now.difference(_lastProcessingTime!);
+
+      if (timeSinceLastProcessing < _minProcessingInterval) {
+        print('⏭️ Skipping message processing trigger - last triggered ${timeSinceLastProcessing.inSeconds} seconds ago');
+        return;
+      }
+    }
+
+    // Update last processing time
+    _lastProcessingTime = now;
+
+    // Trigger processing with a delay to avoid race conditions
+    Future.delayed(const Duration(seconds: 1), () {
+      PeriodicWorkerService.processMessagesNow();
+    });
   }
 
   // Process FCM message
@@ -171,6 +262,22 @@ class FirebaseUtil {
       print("SMS sent successfully to $phoneNumber");
     } catch (e) {
       print("Error sending SMS: $e");
+    }
+  }
+
+  // Clean up the processed message IDs cache to prevent memory leaks
+  // Call this periodically to keep the cache size manageable
+  static void cleanupProcessedMessageIds({int maxSize = 100}) {
+    if (_processedMessageIds.length > maxSize) {
+      print('Cleaning up processed message IDs cache (size: ${_processedMessageIds.length})');
+
+      // Convert to list, sort by most recent (if possible), and keep only the most recent ones
+      // Since we don't track timestamps, we'll just keep the most recent ones based on set order
+      final idsToKeep = _processedMessageIds.toList().reversed.take(maxSize ~/ 2).toSet();
+      _processedMessageIds.clear();
+      _processedMessageIds.addAll(idsToKeep);
+
+      print('Processed message IDs cache cleaned (new size: ${_processedMessageIds.length})');
     }
   }
 }
