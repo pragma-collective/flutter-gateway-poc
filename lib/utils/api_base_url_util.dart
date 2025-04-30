@@ -11,7 +11,7 @@ class ApiUrlConfig {
   String? _baseUrl;
 
   /// Default URL to use if none is saved
-  static const String defaultBaseUrl = 'http://192.168.31.36:8000';
+  static const String defaultBaseUrl = 'https://api.cellfi.xyz';
 
   /// Gets the saved base URL from SharedPreferences
   /// Returns the cached value if available, otherwise fetches from storage
