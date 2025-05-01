@@ -167,6 +167,14 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(
+                child: Image.asset(
+                  'assets/images/cf_icon_coloured.png', // Update with your actual asset path
+                  height: 120,
+                  width: 120,
+                ),
+              ),
+              const SizedBox(height: 32),
               const Text(
                 'Welcome to CellFi',
                 style: TextStyle(
