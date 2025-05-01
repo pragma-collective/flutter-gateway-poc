@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// PeriodicWorkerService handles processing of messages at regular intervals
 class PeriodicWorkerService {
   static const String _lastProcessingKey = 'last_message_processing_time';
-  static const Duration defaultInterval = Duration(minutes: 15);
+  static const Duration defaultInterval = Duration(minutes: 2);
   static const Duration minProcessingInterval = Duration(minutes: 1);
 
   static Timer? _periodicTimer;
@@ -85,10 +85,11 @@ class PeriodicWorkerService {
     final lastProcessing = _lastProcessingTime ?? await _getLastProcessingTime();
     final now = DateTime.now();
 
-    // If last processing was less than 5 minutes ago, skip
+    // Change this to respect the configured interval instead of hardcoded 5 minutes
+    // If last processing was less than the configured minimum interval ago, skip
     if (lastProcessing != null &&
-        now.difference(lastProcessing).inMinutes < 5) {
-      debugPrint('⏳ Last processing was less than 5 minutes ago, skipping');
+        now.difference(lastProcessing).inMinutes < minProcessingInterval.inMinutes) {
+      debugPrint('⏳ Last processing was less than minimum interval ago, skipping');
       return;
     }
 

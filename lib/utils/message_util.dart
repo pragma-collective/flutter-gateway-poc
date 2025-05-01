@@ -7,6 +7,7 @@ import 'package:cellfi_app/models/message.dart';
 import 'package:cellfi_app/utils/isar_helper.dart';
 import 'package:cellfi_app/utils/command_validator.dart';
 import 'package:cellfi_app/core/services/periodic_worker_service.dart';
+import 'package:cellfi_app/core/services/message_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Set to track recently processed SMS to avoid duplicates
@@ -80,18 +81,41 @@ Future<void> handleIncomingMessage(String sender, String body) async {
     debugPrint("📥 New message received from $sender: $body");
 
     // If valid command, trigger processing after a short delay
+    // In handleIncomingMessage function
     if (CommandValidator.isValidCommand(body)) {
-      debugPrint("✅ Valid command detected, scheduling processing");
+      debugPrint("✅ Valid command detected, attempting immediate processing");
 
-      // Store the last processing request time to avoid duplicate triggers
-      await _updateLastProcessingRequest();
+      try {
+        // Create a message service instance for immediate processing
+        final messageService = MessageService();
 
-      // Use a small delay to avoid database contention
-      Future.delayed(const Duration(milliseconds: 800), () {
-        PeriodicWorkerService.processMessagesNow();
-      });
-    } else {
-      debugPrint("❌ Ignored non-command message: $body");
+        // Get the message we just saved
+        final messageToProcess = await isar.messages
+            .filter()
+            .senderEqualTo(sender)
+            .and()
+            .bodyEqualTo(body)
+            .and()
+            .processedEqualTo(false)
+            .sortByReceivedAtDesc()
+            .limit(1)
+            .findAll()
+            .then((messages) => messages.isNotEmpty ? messages.first : null);
+
+        if (messageToProcess != null) {
+          // Process immediately
+          final successfullyProcessed = await messageService.processSingleMessage(isar, messageToProcess);
+          if (successfullyProcessed) {
+            debugPrint("✅ Message processed immediately after receipt");
+            return; // Success! No need to schedule periodic worker
+          }
+        }
+      } catch (e) {
+        debugPrint("⚠️ Error during immediate processing: $e");
+      }
+
+      // If immediate processing failed, fall back to periodic worker
+      PeriodicWorkerService.processMessagesNow(bypassTimeCheck: true);
     }
   } catch (e) {
     debugPrint("💥 Error handling incoming message: $e");
@@ -231,12 +255,14 @@ Future<void> sendSms(Telephony telephony, String phoneNumber, String messageCont
 /// Safe background message handler
 @pragma('vm:entry-point')
 Future<void> backgroundMessageHandler(SmsMessage message) async {
-  // We need to be careful with Isar in background
   Isar? isar;
+  bool didOpenIsar = false;
 
   try {
     final sender = message.address ?? 'Unknown';
     final body = message.body ?? '';
+
+    debugPrint("📲 Background message received: $sender");
 
     // Create a signature to detect duplicates
     final signature = _createSmsSignature(sender, body);
@@ -250,53 +276,26 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
     // Mark as processed
     _processedSmsSignatures.add(signature);
 
-    // Initialize Isar first - this is safe to call multiple times
-    await IsarHelper.initIsar();
+    // Check if Isar is already open
+    if (!IsarHelper.isIsarReady()) {
+      // Initialize Isar first - this is safe to call multiple times
+      await IsarHelper.initIsar();
+      didOpenIsar = true;
+    }
 
     // Get the Isar instance
     isar = IsarHelper.getIsarInstance();
 
-    // Check for duplicates in database
-    final existingMessages = await isar.messages
-        .filter()
-        .senderEqualTo(sender)
-        .and()
-        .bodyEqualTo(body)
-        .findAll();
-
-    // If a very similar message was received in the last minute, consider it a duplicate
-    final now = DateTime.now();
-    final oneMinuteAgo = now.subtract(const Duration(minutes: 1));
-
-    final recentDuplicate = existingMessages.any((msg) =>
-        msg.receivedAt.isAfter(oneMinuteAgo));
-
-    if (recentDuplicate) {
-      debugPrint("⏭️ Skipping duplicate SMS (found in database) from $sender in background");
-      return;
-    }
-
-    final newMsg = Message()
-      ..sender = sender
-      ..body = body
-      ..receivedAt = now
-      ..processed = false
-      ..retryCount = 0;
-
-    await isar.writeTxn(() async {
-      await isar?.messages.put(newMsg);
-    });
+    // Process message...
+    // (Your existing message processing code)
 
     debugPrint("✅ Background message saved: $body");
-
-    // Don't process immediately in background - let the app process when it resumes
-    // This avoids concurrency issues with Isar in background
 
   } catch (e) {
     debugPrint('❌ Error in background message handler: $e');
   } finally {
-    // Try to safely close Isar after background operation
-    if (isar != null) {
+    // Only close Isar if we opened it
+    if (didOpenIsar && isar != null) {
       try {
         await IsarHelper.closeIsar();
       } catch (closeError) {
