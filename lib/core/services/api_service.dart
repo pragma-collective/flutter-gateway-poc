@@ -182,6 +182,24 @@ class ApiService {
     }
   }
 
+  Future<void> checkDevice() async {
+    try {
+      final dio = await _getAuthenticatedDio(); // Use auth-enabled client
+      final response = await dio.get('/device/device.me/');
+
+      if ((response.statusCode == 200 || response.statusCode == 204) &&
+          response.data != null && response.data['api_token'] != null) {
+        final apiToken = response.data['api_token'];
+        await TokenUtil.storeApiToken(apiToken);
+        _cachedApiToken = apiToken; // Cache the token
+      } else {
+        throw Exception("❌ No Device Registration!");
+      }
+    } catch (e) {
+      throw Exception("❌ Unexpected response: $e");
+    }
+  }
+
   /// Reset the cached Dio instance when needed (e.g., when API URL changes)
   void resetClient() {
     _authenticatedDio = null;
