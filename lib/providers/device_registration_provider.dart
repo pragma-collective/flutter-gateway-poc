@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cellfi_app/core/services/api_service.dart';
 import 'package:cellfi_app/utils/token_util.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
 
 class DeviceRegistrationProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -21,8 +22,23 @@ class DeviceRegistrationProvider with ChangeNotifier {
 
     try {
       await _apiService.registerDevice();
+
       // If we reach here, registration was successful
       isDeviceRegistered = true;
+
+      // Ensure Isar is initialized after registration
+      // This helps prevent the issue with database initialization after registration
+      if (!IsarHelper.isIsarReady()) {
+        debugPrint("🔄 Initializing Isar after successful device registration");
+        try {
+          await IsarHelper.initIsar();
+          debugPrint("✅ Isar successfully initialized after registration");
+        } catch (isarError) {
+          debugPrint("⚠️ Non-critical error initializing Isar after registration: $isarError");
+          // We don't want to fail the registration process if Isar init fails
+          // The app will try again later
+        }
+      }
     } catch (e) {
       error = e.toString();
       isDeviceRegistered = false;
@@ -44,6 +60,8 @@ class DeviceRegistrationProvider with ChangeNotifier {
       if (token == null || token.isEmpty) {
         error = "No API token found";
         isDeviceRegistered = false;
+        isLoading = false;
+        notifyListeners();
         return;
       }
 
@@ -51,6 +69,18 @@ class DeviceRegistrationProvider with ChangeNotifier {
 
       // If we get here without an exception, the device is registered
       isDeviceRegistered = true;
+
+      // Also ensure Isar is initialized
+      if (!IsarHelper.isIsarReady()) {
+        debugPrint("🔄 Initializing Isar after successful device check");
+        try {
+          await IsarHelper.initIsar();
+          debugPrint("✅ Isar successfully initialized after device check");
+        } catch (isarError) {
+          debugPrint("⚠️ Non-critical error initializing Isar after device check: $isarError");
+          // We don't want to fail the device check if Isar init fails
+        }
+      }
     } catch (e) {
       error = e.toString();
       isDeviceRegistered = false;

@@ -4,6 +4,9 @@ import 'package:cellfi_app/core/services/secure_storage_service.dart';
 import 'package:provider/provider.dart';
 import 'package:cellfi_app/routes/app_route.dart';
 import 'package:cellfi_app/widgets/api_base_url_selector.dart';
+import 'package:cellfi_app/utils/isar_helper.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/phone_number.dart';
 
 class RegisterDeviceScreen extends StatefulWidget {
   const RegisterDeviceScreen({Key? key}) : super(key: key);
@@ -14,33 +17,61 @@ class RegisterDeviceScreen extends StatefulWidget {
 
 class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneNumberController = TextEditingController();
   bool _isRegistering = false;
+  bool _isInitializing = false;
   String? _errorMessage;
+
+  // For intl phone field
+  PhoneNumber? _phoneNumber;
+  String? _completePhoneNumber;
+  bool _isPhoneNumberValid = false;
 
   @override
   void initState() {
     super.initState();
     _loadPhoneNumber();
+
+    // Pre-initialize Isar when the registration screen is shown
+    // This prevents the database initialization delay after registration
+    _preInitializeIsar();
+  }
+
+  Future<void> _preInitializeIsar() async {
+    // Only do this if Isar isn't already ready
+    if (!IsarHelper.isIsarReady()) {
+      setState(() {
+        _isInitializing = true;
+      });
+
+      try {
+        await IsarHelper.initIsar();
+        debugPrint("✅ Isar pre-initialized in registration screen");
+      } catch (e) {
+        debugPrint("⚠️ Non-critical error pre-initializing Isar: $e");
+        // We don't want to block registration if Isar pre-init fails
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _loadPhoneNumber() async {
     try {
-      final phoneNumber = await SecureStorageService.getPhoneNumber();
-      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      final savedPhoneNumber = await SecureStorageService.getPhoneNumber();
+      if (savedPhoneNumber != null && savedPhoneNumber.isNotEmpty) {
+        // Just set the saved number - the field will handle displaying it
         setState(() {
-          _phoneNumberController.text = phoneNumber;
+          _completePhoneNumber = savedPhoneNumber;
         });
+        debugPrint("📱 Loaded saved phone number: $savedPhoneNumber");
       }
     } catch (e) {
       debugPrint("Error loading phone number: $e");
     }
-  }
-
-  @override
-  void dispose() {
-    _phoneNumberController.dispose();
-    super.dispose();
   }
 
   void _showApiUrlDialog() {
@@ -48,7 +79,11 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
   }
 
   Future<void> _registerDevice() async {
-    if (!_formKey.currentState!.validate()) {
+    // Validate the form
+    if (!_formKey.currentState!.validate() || !_isPhoneNumberValid || _phoneNumber == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid phone number')),
+      );
       return;
     }
 
@@ -58,8 +93,12 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
     });
 
     try {
+      // Create the complete phone number with plus sign
+      final completeNumber = '+${_phoneNumber!.countryCode}${_phoneNumber!.number}';
+
       // Save phone number to secure storage
-      await SecureStorageService.savePhoneNumber(_phoneNumberController.text);
+      await SecureStorageService.savePhoneNumber(completeNumber);
+      debugPrint("📱 Saving phone number: $completeNumber");
 
       // Register the device
       final provider = Provider.of<DeviceRegistrationProvider>(context, listen: false);
@@ -73,8 +112,31 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
         return;
       }
 
+      // Add a small delay to ensure everything is ready
+      await Future.delayed(const Duration(milliseconds: 300));
+
       // Navigate to SMS screen on success
       if (mounted) {
+        // Check if Isar is ready before navigation
+        if (!IsarHelper.isIsarReady()) {
+          debugPrint("⚠️ Isar not ready after registration, initializing now");
+
+          // Show a "preparing database" indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration successful. Preparing database...')),
+          );
+
+          try {
+            await IsarHelper.initIsar();
+            debugPrint("✅ Isar initialized before navigation");
+          } catch (e) {
+            debugPrint("⚠️ Non-critical error initializing Isar before navigation: $e");
+            // Continue with navigation even if Isar init fails
+            // The SMS screen will handle the initialization if needed
+          }
+        }
+
+        // Now navigate
         Navigator.of(context).pushReplacementNamed(AppRoutes.smsScreen);
       }
     } catch (e) {
@@ -119,30 +181,54 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              TextFormField(
-                controller: _phoneNumberController,
+
+              // International Phone Field
+              IntlPhoneField(
                 decoration: const InputDecoration(
                   labelText: 'Phone Number',
-                  helperText: 'Enter your full phone number with country code',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                  counterText: '', // Hide the counter
                 ),
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your phone number';
-                  }
-                  if (value.length < 10) {
-                    return '📵 Enter a valid phone number';
+                initialCountryCode: 'PH', // Default to Philippines
+                onChanged: (phone) {
+                  setState(() {
+                    _phoneNumber = phone;
+                    _isPhoneNumberValid = true; // Basic validation happens in the field
+                  });
+                },
+                onCountryChanged: (country) {
+                  debugPrint('Country changed to: ${country.name}');
+                },
+                validator: (phone) {
+                  if (phone == null || phone.number.isEmpty) {
+                    return 'Please enter a phone number';
                   }
                   return null;
                 },
+                disableLengthCheck: false, // Enable length check based on country
+                flagsButtonPadding: const EdgeInsets.symmetric(horizontal: 8),
+                showDropdownIcon: true,
+                dropdownIconPosition: IconPosition.trailing,
+                invalidNumberMessage: 'Invalid phone number',
               ),
+
+              const SizedBox(height: 8),
+              Text(
+                '* Please include your country code',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _isRegistering ? null : _registerDevice,
+                onPressed: (_isRegistering || _isInitializing || _phoneNumber == null) ? null : _registerDevice,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 ),
                 child: _isRegistering
                     ? const Row(
@@ -153,10 +239,27 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
+                        color: Colors.white,
                       ),
                     ),
                     SizedBox(width: 12),
                     Text('Registering...'),
+                  ],
+                )
+                    : _isInitializing
+                    ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Preparing...'),
                   ],
                 )
                     : const Text('Register Device'),
