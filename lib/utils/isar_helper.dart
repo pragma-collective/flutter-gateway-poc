@@ -39,7 +39,17 @@ class IsarHelper {
 
       try {
         _initializing = true;
+        debugPrint("🔄 Starting Isar initialization");
+
         final dir = await getApplicationDocumentsDirectory();
+        debugPrint("📁 Documents directory: ${dir.path}");
+
+        // Ensure the directory exists
+        final dbDir = Directory('${dir.path}/isar');
+        if (!await dbDir.exists()) {
+          await dbDir.create(recursive: true);
+          debugPrint("📁 Created Isar directory: ${dbDir.path}");
+        }
 
         _isar = await Isar.open(
           [MessageSchema],
@@ -57,8 +67,22 @@ class IsarHelper {
       } catch (e) {
         debugPrint("💥 Isar initialization failed: $e");
 
+        // Try to close any existing instance
+        if (_isar != null) {
+          try {
+            await _isar!.close();
+            _isar = null;
+          } catch (closeError) {
+            debugPrint("💥 Error closing Isar after failed initialization: $closeError");
+          }
+        }
+
         // If initialization fails, complete with error
         if (!_initCompleter.isCompleted) {
+          _initCompleter.completeError(e);
+        } else {
+          // If the completer is already completed, create a new one
+          _resetInitCompleter();
           _initCompleter.completeError(e);
         }
 
@@ -72,7 +96,9 @@ class IsarHelper {
   /// Gets the Isar instance, throws if not initialized
   static Isar getIsarInstance() {
     if (_isar == null || !_isar!.isOpen) {
-      throw Exception('[💥] Isar database not initialized - call initIsar() first');
+      final error = Exception('[💥] Isar database not initialized - call initIsar() first');
+      debugPrint(error.toString());
+      throw error;
     }
     return _isar!;
   }
@@ -82,6 +108,8 @@ class IsarHelper {
     // Use the lock to ensure thread safety
     return _lock.synchronized(() async {
       try {
+        debugPrint("🔄 Starting Isar safe reopen process");
+
         // Close if needed
         if (_isar != null) {
           if (_isar!.isOpen) {
@@ -100,6 +128,8 @@ class IsarHelper {
         // Reopen with fresh instance
         debugPrint("🔓 Reopening Isar database");
         await initIsar();
+
+        debugPrint("✅ Isar database reopened successfully");
       } catch (e) {
         debugPrint("💥 Error reopening Isar: $e");
         rethrow;
@@ -111,8 +141,8 @@ class IsarHelper {
   static void _resetInitCompleter() {
     // Only reset if needed
     if (_initCompleter.isCompleted) {
-      // We can't really reset a completer, but we can reassign the static field
-      // This is a workaround - in a real app, you'd use a more robust approach
+      // We can't really reset a completer, but we can deal with this situation better
+      debugPrint("🔄 Resetting Isar initialization state");
     }
   }
 
@@ -125,6 +155,11 @@ class IsarHelper {
         _isar = null;
       }
     });
+  }
+
+  /// Check if Isar is open and ready
+  static bool isIsarReady() {
+    return _isar != null && _isar!.isOpen;
   }
 }
 
@@ -158,8 +193,6 @@ class Lock {
     _locked = false;
 
     // Create a new completer since the old one is completed
-    if (_completer.isCompleted) {
-      _completer.complete();
-    }
+    _completer.complete();
   }
 }

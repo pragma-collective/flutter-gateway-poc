@@ -17,6 +17,7 @@ import 'package:cellfi_app/utils/firebase_util.dart';
 // Flag to track app initialization state
 bool _isInitializing = false;
 bool _isInitialized = false;
+const int MAX_INIT_RETRIES = 3;
 
 void main() async {
   // Ensure Flutter is initialized
@@ -32,8 +33,8 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Initialize Isar database
-    await IsarHelper.initIsar();
+    // Initialize Isar database with retries
+    await _initializeIsarWithRetry();
 
     // Initialize Telephony instance
     final telephony = Telephony.instance;
@@ -110,6 +111,46 @@ void main() async {
   }
 }
 
+// Helper method to initialize Isar with retries
+Future<void> _initializeIsarWithRetry() async {
+  int retries = 0;
+  bool success = false;
+
+  while (!success && retries < MAX_INIT_RETRIES) {
+    try {
+      debugPrint("🔄 Attempting to initialize Isar (attempt ${retries + 1}/${MAX_INIT_RETRIES})");
+
+      // If it's a retry, completely close Isar first
+      if (retries > 0) {
+        try {
+          await IsarHelper.closeIsar();
+          await Future.delayed(const Duration(milliseconds: 500)); // Brief pause
+        } catch (e) {
+          debugPrint("⚠️ Error closing Isar before retry: $e");
+        }
+      }
+
+      // Initialize Isar
+      await IsarHelper.initIsar();
+
+      // If we get here without an exception, it was successful
+      success = true;
+      debugPrint("✅ Isar initialization successful on attempt ${retries + 1}");
+    } catch (e) {
+      retries++;
+      debugPrint("❌ Isar initialization failed (attempt $retries): $e");
+
+      if (retries < MAX_INIT_RETRIES) {
+        // Wait a bit before retrying
+        await Future.delayed(const Duration(seconds: 1));
+      } else {
+        debugPrint("🚨 All Isar initialization attempts failed");
+        rethrow;
+      }
+    }
+  }
+}
+
 class CellFiApp extends StatefulWidget {
   const CellFiApp({super.key});
 
@@ -153,7 +194,12 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
 
       try {
         // Carefully reopen Isar if needed
-        await IsarHelper.safeReopenIsar();
+        if (!IsarHelper.isIsarReady()) {
+          debugPrint("🔄 Isar not ready, reopening on resume");
+          await IsarHelper.safeReopenIsar();
+        } else {
+          debugPrint("✅ Isar already open and ready on resume");
+        }
 
         // Small additional delay after reopening
         await Future.delayed(const Duration(milliseconds: 300));
@@ -171,7 +217,7 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
         if (!_isInitializing && !_isInitialized) {
           debugPrint("🔄 Trying to re-initialize app after failed resume");
           try {
-            await IsarHelper.initIsar();
+            await _initializeIsarWithRetry();
           } catch (initError) {
             debugPrint("💥 Failed to re-initialize Isar: $initError");
           }
@@ -272,6 +318,62 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
               }
 
               debugPrint("✅ Device registration verified, loading messages");
+
+              // Verify Isar is ready before loading messages
+              if (!IsarHelper.isIsarReady()) {
+                debugPrint("⚠️ Isar not ready before loading SMS screen, initializing now");
+                return FutureBuilder<void>(
+                  future: IsarHelper.initIsar(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Scaffold(
+                        body: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text("Preparing database..."),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Scaffold(
+                        body: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                              const SizedBox(height: 16),
+                              const Text('Database initialization error'),
+                              const SizedBox(height: 8),
+                              Text(
+                                snapshot.error.toString(),
+                                style: const TextStyle(color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  // Try again
+                                  setState(() {});
+                                },
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    // If everything is OK, proceed to the SMS screen
+                    return const SmsScreen();
+                  },
+                );
+              }
 
               // If everything is OK, proceed to the SMS screen through the MessageProvider
               return Consumer<MessageProvider>(
