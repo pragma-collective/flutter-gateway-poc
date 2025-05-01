@@ -184,7 +184,6 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
     }
   }
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -234,17 +233,67 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
           }
 
           final token = snapshot.data;
-          return Consumer<MessageProvider>(
-            builder: (context, provider, _) {
-              if (provider.isLoading) {
+
+          // If no token is found, immediately go to registration screen
+          if (token == null || token.isEmpty) {
+            debugPrint("🔑 No API token found, going to registration screen");
+            return const RegisterDeviceScreen();
+          }
+
+          // If token exists, check with the server using the DeviceRegistrationProvider
+          return Consumer<DeviceRegistrationProvider>(
+            builder: (context, deviceProvider, _) {
+              // Trigger the checkDevice method when this Consumer is built
+              // but only once to avoid infinite loops
+              if (deviceProvider.isLoading) {
+                debugPrint("🔄 Checking device registration status...");
+                // This will happen on the first build only because we're checking isLoading
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  deviceProvider.checkDevice();
+                });
                 return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text("Verifying device registration..."),
+                      ],
+                    ),
+                  ),
                 );
               }
 
-              return (token != null && token.isNotEmpty)
-                  ? const SmsScreen()
-                  : const RegisterDeviceScreen();
+              // If there's an error or the device check failed, go to registration
+              if (deviceProvider.error != null || !deviceProvider.isDeviceRegistered) {
+                debugPrint("❌ Device not registered: ${deviceProvider.error}");
+                return const RegisterDeviceScreen();
+              }
+
+              debugPrint("✅ Device registration verified, loading messages");
+
+              // If everything is OK, proceed to the SMS screen through the MessageProvider
+              return Consumer<MessageProvider>(
+                builder: (context, messageProvider, _) {
+                  if (messageProvider.isLoading) {
+                    return const Scaffold(
+                      body: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 16),
+                            Text("Loading messages..."),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return const SmsScreen();
+                },
+              );
             },
           );
         },

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:provider/provider.dart';
-import 'package:cellfi_app/core/services/secure_storage_service.dart';
 import 'package:cellfi_app/providers/device_registration_provider.dart';
-import 'package:cellfi_app/utils/api_base_url_util.dart';
+import 'package:cellfi_app/core/services/secure_storage_service.dart';
+import 'package:provider/provider.dart';
+import 'package:cellfi_app/routes/app_route.dart';
 import 'package:cellfi_app/widgets/api_base_url_selector.dart';
-import 'sms_screen.dart';
 
 class RegisterDeviceScreen extends StatefulWidget {
-  const RegisterDeviceScreen({super.key});
+  const RegisterDeviceScreen({Key? key}) : super(key: key);
 
   @override
   State<RegisterDeviceScreen> createState() => _RegisterDeviceScreenState();
@@ -16,209 +14,187 @@ class RegisterDeviceScreen extends StatefulWidget {
 
 class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
   final _formKey = GlobalKey<FormState>();
-  String? _fullPhoneNumber;
-  bool _loading = false;
-  String? _currentBaseUrl;
-  final _apiConfig = ApiUrlConfig();
+  final _phoneNumberController = TextEditingController();
+  bool _isRegistering = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentBaseUrl();
+    _loadPhoneNumber();
   }
 
-  Future<void> _loadCurrentBaseUrl() async {
-    final url = await _apiConfig.getBaseUrl();
-    if (mounted) {
-      setState(() {
-        _currentBaseUrl = url;
-      });
-    }
-  }
-
-  Future<void> _showApiBaseUrlDialog() async {
-    await ApiBaseUrlDialog.show(context);
-    // Reload the current base URL after dialog is closed
-    _loadCurrentBaseUrl();
-
-    // Update the provider with the new URL
-    if (mounted) {
-      try {
-        final provider = context.read<DeviceRegistrationProvider>();
-        final newBaseUrl = await _apiConfig.getBaseUrl();
-
-        if (newBaseUrl.isNotEmpty) {
-          // Update the provider with the new URL
-          provider.updateConfig(
-            baseUrl: newBaseUrl,
-            // You can add more config parameters here if needed
-          );
-
-          // Optionally log the update for debugging
-          debugPrint('Updated provider base URL to: $newBaseUrl');
-
-          // Show success confirmation to user
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('API configuration updated successfully'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          // Handle case where baseUrl is empty
-          debugPrint('Warning: Retrieved base URL is empty');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to update API configuration: Empty URL'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      } catch (e) {
-        // Handle any errors during the update process
-        debugPrint('Error updating provider config: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update API configuration: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+  Future<void> _loadPhoneNumber() async {
+    try {
+      final phoneNumber = await SecureStorageService.getPhoneNumber();
+      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        setState(() {
+          _phoneNumberController.text = phoneNumber;
+        });
       }
+    } catch (e) {
+      debugPrint("Error loading phone number: $e");
     }
   }
 
+  @override
+  void dispose() {
+    _phoneNumberController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    _formKey.currentState!.save();
+  void _showApiUrlDialog() {
+    ApiBaseUrlDialog.show(context);
+  }
 
-    if (_fullPhoneNumber == null || _fullPhoneNumber!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Phone number is required')),
-      );
+  Future<void> _registerDevice() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() {
-      _loading = true;
+      _isRegistering = true;
+      _errorMessage = null;
     });
 
     try {
-      await SecureStorageService.savePhoneNumber(_fullPhoneNumber!);
-      final provider = context.read<DeviceRegistrationProvider>();
+      // Save phone number to secure storage
+      await SecureStorageService.savePhoneNumber(_phoneNumberController.text);
+
+      // Register the device
+      final provider = Provider.of<DeviceRegistrationProvider>(context, listen: false);
       await provider.register();
 
-      if (!mounted) {
+      if (provider.error != null) {
+        setState(() {
+          _errorMessage = provider.error;
+          _isRegistering = false;
+        });
         return;
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SmsScreen()),
-      );
+      // Navigate to SMS screen on success
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.smsScreen);
+      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Registration failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      setState(() {
+        _errorMessage = e.toString();
+        _isRegistering = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Register Device")),
+      appBar: AppBar(
+        title: const Text('Register Device'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showApiUrlDialog,
+            tooltip: 'API Settings',
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Display the current base URL and button to change it
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
+              const Text(
+                'Welcome to CellFi',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'API URL',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _showApiBaseUrlDialog,
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Change'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _currentBaseUrl ?? 'Not set',
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: _currentBaseUrl != null
-                              ? Colors.black87
-                              : Colors.red,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              IntlPhoneField(
+              const Text(
+                'Please enter your phone number to register this device.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _phoneNumberController,
                 decoration: const InputDecoration(
                   labelText: 'Phone Number',
+                  helperText: 'Enter your full phone number with country code',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
                 ),
-                initialCountryCode: 'PH',
-                onSaved: (phone) => _fullPhoneNumber = phone?.completeNumber,
-                validator: (phone) {
-                  if (phone == null || phone.completeNumber.isEmpty) {
-                    return 'Please enter a valid number';
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  if (value.length < 10) {
+                    return '📵 Enter a valid phone number';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              _loading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                onPressed: _submit,
-                child: const Text('Register Device'),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _isRegistering ? null : _registerDevice,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: _isRegistering
+                    ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Registering...'),
+                  ],
+                )
+                    : const Text('Register Device'),
               ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text(
+                            'Registration Error',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
