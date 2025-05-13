@@ -50,17 +50,26 @@ android {
     }
 
     signingConfigs {
+        // Keep this block for local development
+        // For CI/CD, we'll use Bitrise's Android Sign step instead
         release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
+            // Add a check to only use this config when the properties file exists and contains valid entries
+            if (project.hasProperty('keystoreProperties')
+                    && keystoreProperties['storeFile'] != null
+                    && !keystoreProperties['storeFile'].isEmpty()) {
+
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
         }
     }
 
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "xyz.cellfi.cellfi_app" //
+        applicationId "xyz.cellfi.cellfi_app"
         resValue "string", "app_name", "CellFi"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
@@ -72,9 +81,13 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.release
+            // Only apply the signing config if it's fully configured
+            if (project.hasProperty('keystoreProperties')
+                    && keystoreProperties['storeFile'] != null
+                    && !keystoreProperties['storeFile'].isEmpty()) {
+
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             signingConfig signingConfigs.debug
