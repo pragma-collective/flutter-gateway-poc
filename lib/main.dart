@@ -1,6 +1,6 @@
 import 'package:cellfi_app/core/services/periodic_worker_service.dart';
 import 'package:cellfi_app/core/services/message_service.dart';
-import 'package:cellfi_app/screens/sms_screen.dart';
+import 'package:cellfi_app/screens/home_screen.dart';
 import 'package:cellfi_app/screens/register_device.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -374,19 +374,8 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
                       );
                     }
 
-                    return const Scaffold(
-                      body: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Boink!'),
-                          ],
-                        ),
-                      ),
-                    );
-
                     // If everything is OK, proceed to the SMS screen
-                    return const SmsScreen();
+                    return const HomeScreen();
                   },
                 );
               }
@@ -409,18 +398,7 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
                     );
                   }
 
-                  return const Scaffold(
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Boink!'),
-                        ],
-                      ),
-                    ),
-                  );
-
-                  return const SmsScreen();
+                  return const HomeScreen();
                 },
               );
             },
@@ -429,7 +407,7 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
       ),
       routes: {
         AppRoutes.registerDevice: (_) => const RegisterDeviceScreen(),
-        // AppRoutes.smsScreen: (_) => const SmsScreen(),
+        AppRoutes.home: (_) => const HomeScreen(),
       },
     );
   }

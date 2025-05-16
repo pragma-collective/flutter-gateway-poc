@@ -137,7 +137,7 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen> {
         }
 
         // Now navigate
-        Navigator.of(context).pushReplacementNamed(AppRoutes.smsScreen);
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       }
     } catch (e) {
       setState(() {
