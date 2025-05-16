@@ -52,7 +52,7 @@ class PeriodicWorkerService {
     _periodicTimer?.cancel();
 
     _periodicTimer = Timer.periodic(interval, (_) {
-      _checkAndProcessMessages();
+      // _checkAndProcessMessages();
     });
 
     debugPrint('✅ Periodic timer started with interval: ${interval.inMinutes} minutes');

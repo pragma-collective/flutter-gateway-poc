@@ -15,37 +15,43 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Initialize Firebase
   await Firebase.initializeApp();
 
-  print('Background message received: ${message.data}');
+  debugPrint('Background message received: ${message.data}');
 
-  // Check if we've already processed this message
-  final messageId = message.messageId ?? 'unknown';
-  if (_processedMessageIds.contains(messageId)) {
-    print('⏭️ Already processed FCM message: $messageId, skipping');
-    return;
-  }
+  final success = await FirebaseUtil._processMessageBackground(message, Telephony.instance);
+  
+  debugPrint("Background SMS processing ${success ? 'succeeded' : 'failed'}");
 
-  // Mark as processed
-  _processedMessageIds.add(messageId);
+  // print('Background message received: ${message.data}');
 
-  // Store message for processing when app is active
-  final prefs = await SharedPreferences.getInstance();
-  final messagesJson = prefs.getStringList('pending_messages') ?? [];
+  // // Check if we've already processed this message
+  // final messageId = message.messageId ?? 'unknown';
+  // if (_processedMessageIds.contains(messageId)) {
+  //   print('⏭️ Already processed FCM message: $messageId, skipping');
+  //   return;
+  // }
 
-  // Simple storage of message data
-  final data = message.data;
-  final phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? data['PHONENUMBER'];
-  final messageContent = data['messageContent'] ?? data['message_content'] ?? data['MESSAGECONTENT'] ?? data['message'];
+  // // Mark as processed
+  // _processedMessageIds.add(messageId);
 
-  if (phoneNumber != null && messageContent != null) {
-    messagesJson.add('$phoneNumber|||$messageContent');
-    await prefs.setStringList('pending_messages', messagesJson);
-    print('Message stored for later processing: $phoneNumber - $messageContent');
-  }
+  // // Store message for processing when app is active
+  // final prefs = await SharedPreferences.getInstance();
+  // final messagesJson = prefs.getStringList('pending_messages') ?? [];
 
-  // We'll intentionally avoid triggering message processing here
-  // to prevent duplicate processing. Instead, we'll let the app
-  // handle processing when it resumes.
-  print('✅ Background message stored for later processing');
+  // // Simple storage of message data
+  // final data = message.data;
+  // final phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? data['PHONENUMBER'];
+  // final messageContent = data['messageContent'] ?? data['message_content'] ?? data['MESSAGECONTENT'] ?? data['message'];
+
+  // if (phoneNumber != null && messageContent != null) {
+  //   messagesJson.add('$phoneNumber|||$messageContent');
+  //   await prefs.setStringList('pending_messages', messagesJson);
+  //   print('Message stored for later processing: $phoneNumber - $messageContent');
+  // }
+
+  // // We'll intentionally avoid triggering message processing here
+  // // to prevent duplicate processing. Instead, we'll let the app
+  // // handle processing when it resumes.
+  // print('✅ Background message stored for later processing');
 }
 
 class FirebaseUtil {
@@ -111,73 +117,77 @@ class FirebaseUtil {
     print("Setting up Firebase Messaging listeners...");
 
     // Handle foreground messages
-    _foregroundSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("FOREGROUND MESSAGE RECEIVED ======================");
-      print("Message ID: ${message.messageId}");
-      print("Message data: ${message.data}");
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      debugPrint("FOREGROUND MESSAGE RECEIVED ======================");
+      debugPrint("Message ID: ${message.messageId}");
+      debugPrint("Message data: ${message.data}");
 
-      // Check if we've already processed this message
-      final messageId = message.messageId ?? 'unknown';
-      if (_processedMessageIds.contains(messageId)) {
-        print('⏭️ Already processed FCM message: $messageId, skipping');
-        return;
-      }
+      final success = await FirebaseUtil._processMessageBackground(message, Telephony.instance);
+      debugPrint("Foreground SMS processing ${success ? 'succeeded' : 'failed'}");
+      return;
 
-      // Mark as processed
-      _processedMessageIds.add(messageId);
+      // // Check if we've already processed this message
+      // final messageId = message.messageId ?? 'unknown';
+      // if (_processedMessageIds.contains(messageId)) {
+      //   print('⏭️ Already processed FCM message: $messageId, skipping');
+      //   return;
+      // }
 
-      // Process the message
-      _processMessage(message, telephony);
+      // // Mark as processed
+      // _processedMessageIds.add(messageId);
 
-      // Trigger SMS processing, but with rate limiting
-      _triggerProcessingWithRateLimit();
+      // // Process the message
+      // _processMessage(message, telephony);
+
+      // // Trigger SMS processing, but with rate limiting
+      // _triggerProcessingWithRateLimit();
     });
 
     // Handle when app is opened from notification
-    _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("APP OPENED FROM NOTIFICATION ======================");
-      print("Message data: ${message.data}");
+    // _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    //   print("APP OPENED FROM NOTIFICATION ======================");
+    //   print("Message data: ${message.data}");
 
-      // Check if we've already processed this message
-      final messageId = message.messageId ?? 'unknown';
-      if (_processedMessageIds.contains(messageId)) {
-        print('⏭️ Already processed FCM message: $messageId, skipping');
-        return;
-      }
+    //   // Check if we've already processed this message
+    //   final messageId = message.messageId ?? 'unknown';
+    //   if (_processedMessageIds.contains(messageId)) {
+    //     print('⏭️ Already processed FCM message: $messageId, skipping');
+    //     return;
+    //   }
 
-      // Mark as processed
-      _processedMessageIds.add(messageId);
+    //   // Mark as processed
+    //   _processedMessageIds.add(messageId);
 
-      // Process the message
-      _processMessage(message, telephony);
+    //   // Process the message
+    //   _processMessage(message, telephony);
 
-      // Trigger SMS processing, but with rate limiting
-      _triggerProcessingWithRateLimit();
-    });
+    //   // Trigger SMS processing, but with rate limiting
+    //   _triggerProcessingWithRateLimit();
+    // });
 
     // Check for initial message (app opened from terminated state)
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
-      if (message != null) {
-        print("APP STARTED FROM TERMINATED STATE VIA NOTIFICATION ======================");
-        print("Message data: ${message.data}");
+    // FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    //   if (message != null) {
+    //     print("APP STARTED FROM TERMINATED STATE VIA NOTIFICATION ======================");
+    //     print("Message data: ${message.data}");
 
-        // Check if we've already processed this message
-        final messageId = message.messageId ?? 'unknown';
-        if (_processedMessageIds.contains(messageId)) {
-          print('⏭️ Already processed FCM message: $messageId, skipping');
-          return;
-        }
+    //     // Check if we've already processed this message
+    //     final messageId = message.messageId ?? 'unknown';
+    //     if (_processedMessageIds.contains(messageId)) {
+    //       print('⏭️ Already processed FCM message: $messageId, skipping');
+    //       return;
+    //     }
 
-        // Mark as processed
-        _processedMessageIds.add(messageId);
+    //     // Mark as processed
+    //     _processedMessageIds.add(messageId);
 
-        // Process the message
-        _processMessage(message, telephony);
+    //     // Process the message
+    //     _processMessage(message, telephony);
 
-        // Trigger SMS processing, but with rate limiting
-        _triggerProcessingWithRateLimit();
-      }
-    });
+    //     // Trigger SMS processing, but with rate limiting
+    //     _triggerProcessingWithRateLimit();
+    //   }
+    // });
 
     print("Firebase Messaging listeners setup complete");
   }
@@ -203,6 +213,94 @@ class FirebaseUtil {
     Future.delayed(const Duration(seconds: 1), () {
       PeriodicWorkerService.processMessagesNow();
     });
+  }
+
+  // Process FCM message
+  static Future<bool> _processMessageBackground(RemoteMessage message, Telephony telephony) async {
+    try {
+      final data = message.data;
+      final phoneNumber = data['phoneNumber'] ?? data['phone_number'] ?? data['PHONENUMBER'];
+      final messageContent = data['messageContent'] ?? data['message_content'] ?? data['MESSAGECONTENT'] ?? data['message'];
+
+      debugPrint("Extracted PhoneNumber: $phoneNumber");
+      debugPrint("Extracted MessageContent: $messageContent");
+
+      if (phoneNumber != null && messageContent != null) {
+        debugPrint("Sending SMS via telephony...");
+        final success = await _sendSmsBackground(telephony, phoneNumber, messageContent);
+        return success;
+      } else {
+        debugPrint("Cannot send SMS - missing phone number or message content");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error processing message: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> _sendSmsBackground(Telephony telephony, String phoneNumber, String messageContent, {int attempt = 1, int maxRetries = 3}) async {
+    try {
+      final completer = Completer<bool>();
+      bool receivedCallback = false;
+      
+      // Set a timeout for SMS delivery confirmation (1 minute)
+      Timer deliveryTimeout = Timer(const Duration(minutes: 1), () {
+        if (!completer.isCompleted) {
+          debugPrint("⏱️ SMS status timeout for $phoneNumber (attempt $attempt)");
+          completer.complete(false);
+        }
+      });
+      
+      await telephony.sendSms(
+        to: phoneNumber,
+        message: messageContent,
+        statusListener: (SendStatus status) {
+          receivedCallback = true;
+          if (status == SendStatus.DELIVERED) {
+            debugPrint("✅ SMS delivered successfully to $phoneNumber");
+            if (!completer.isCompleted) {
+              deliveryTimeout.cancel();
+              completer.complete(true);
+            }
+          } else if (status == SendStatus.SENT) {
+            debugPrint("📤 SMS sent to $phoneNumber (awaiting delivery confirmation)");
+            // Don't complete yet, wait for DELIVERED
+          }
+        },  
+      );
+      
+      // If we don't receive any status callback within 10 seconds, assume it was just sent
+      Timer(const Duration(seconds: 10), () {
+        if (!receivedCallback && !completer.isCompleted) {
+          debugPrint("ℹ️ No status received for SMS to $phoneNumber, assuming sent");
+          completer.complete(true);
+        }
+      });
+      
+      return await completer.future;
+    } catch (e) {
+      debugPrint("❌ Error sending SMS (attempt $attempt): $e");
+      
+      // Retry logic with Fibonacci delay pattern
+      if (attempt < maxRetries) {
+        // Calculate Fibonacci delay: 1 min, 2 min, 3 min
+        final int delayMinutes = attempt + (attempt > 1 ? attempt - 1 : 0);
+        debugPrint("🔄 Will retry in $delayMinutes minutes (attempt ${attempt+1}/$maxRetries)");
+        
+        await Future.delayed(Duration(minutes: delayMinutes));
+        return _sendSmsBackground(
+          telephony, 
+          phoneNumber, 
+          messageContent,
+          attempt: attempt + 1,
+          maxRetries: maxRetries
+        );
+      }
+
+      debugPrint("⛔ Max retries reached for SMS to $phoneNumber");
+      return false;
+    }
   }
 
   // Process FCM message
@@ -259,9 +357,8 @@ class FirebaseUtil {
         to: phoneNumber,
         message: messageContent,
       );
-      print("SMS sent successfully to $phoneNumber");
     } catch (e) {
-      print("Error sending SMS: $e");
+      debugPrint("Error sending SMS: $e");
     }
   }
 

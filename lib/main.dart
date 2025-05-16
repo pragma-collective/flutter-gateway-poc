@@ -13,6 +13,7 @@ import 'package:cellfi_app/providers/device_registration_provider.dart';
 import 'package:cellfi_app/providers/message_provider.dart';
 import 'package:cellfi_app/utils/isar_helper.dart';
 import 'package:cellfi_app/utils/firebase_util.dart';
+import 'package:cellfi_app/core/services/sms_service.dart';
 
 // Flag to track app initialization state
 bool _isInitializing = false;
@@ -52,6 +53,10 @@ void main() async {
     // Mark initialization as complete
     _isInitializing = false;
     _isInitialized = true;
+
+    final SMSService smsService = SMSService();
+
+    smsService.initializeListener();
 
     // Run the app
     runApp(
@@ -369,6 +374,17 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
                       );
                     }
 
+                    return const Scaffold(
+                      body: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Boink!'),
+                          ],
+                        ),
+                      ),
+                    );
+
                     // If everything is OK, proceed to the SMS screen
                     return const SmsScreen();
                   },
@@ -393,6 +409,17 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
                     );
                   }
 
+                  return const Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Boink!'),
+                        ],
+                      ),
+                    ),
+                  );
+
                   return const SmsScreen();
                 },
               );
@@ -402,7 +429,7 @@ class _CellFiAppState extends State<CellFiApp> with WidgetsBindingObserver {
       ),
       routes: {
         AppRoutes.registerDevice: (_) => const RegisterDeviceScreen(),
-        AppRoutes.smsScreen: (_) => const SmsScreen(),
+        // AppRoutes.smsScreen: (_) => const SmsScreen(),
       },
     );
   }

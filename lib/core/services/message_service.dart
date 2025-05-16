@@ -30,7 +30,7 @@ class MessageService extends ChangeNotifier {
 
   MessageService() {
     // Start automatic processing if not already running
-    startAutomaticProcessing();
+    // startAutomaticProcessing();
   }
 
   /// Starts automatic processing of messages at regular intervals
