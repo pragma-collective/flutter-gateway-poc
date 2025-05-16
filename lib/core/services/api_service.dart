@@ -37,8 +37,8 @@ class ApiService {
     // Create optimized Dio instance
     final dio = Dio(BaseOptions(
       baseUrl: '$baseUrl/api',
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(minutes: 2),
+      receiveTimeout: const Duration(minutes: 2),
       // Enable gzip for faster transfers
       responseType: ResponseType.json,
       headers: {
